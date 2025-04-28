@@ -1,3 +1,5 @@
+package com.example.demo.controller;
+
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -11,22 +13,36 @@ import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/stream")
+@CrossOrigin(origins = "http://localhost:5173")
 public class VideoStreamController {
+    private final String basePath = "/Users/reoshiro/Documents/POC/streaming-poc/bucket";
 
-    private final String videoBasePath = "/caminho/absoluto/para/seus/arquivos/videos"; // <== Ajuste aqui!
-
-    @GetMapping("/{fileName:.+}")
-    public ResponseEntity<Resource> streamVideo(@PathVariable String fileName) throws Exception {
-        // Monta o caminho do arquivo
-        File file = new File(videoBasePath, fileName);
+    @GetMapping("/videos/{*path}")
+    public ResponseEntity<Resource> streamVideo(@PathVariable("path") String path) throws Exception {
+        File file = new File(basePath + "/videos/" + path);
 
         if (!file.exists()) {
             return ResponseEntity.notFound().build();
         }
 
-        // Detecta o tipo do arquivo dinamicamente
-        String contentType = detectMimeType(file.toPath(), fileName);
+        String contentType = detectMimeType(file.toPath(), file.getName());
+        Resource resource = new FileSystemResource(file);
 
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getName() + "\"")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
+    }
+
+    @GetMapping("/thumbnails/{filename:.+}")
+    public ResponseEntity<Resource> streamThumbnail(@PathVariable String filename) throws Exception {
+        File file = new File(basePath + "/thumbnails/" + filename);
+
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String contentType = Files.probeContentType(file.toPath());
         Resource resource = new FileSystemResource(file);
 
         return ResponseEntity.ok()
@@ -41,7 +57,6 @@ public class VideoStreamController {
         } else if (fileName.endsWith(".ts")) {
             return "video/MP2T";
         } else {
-            // Tenta descobrir automaticamente
             String type = Files.probeContentType(path);
             return (type != null) ? type : "application/octet-stream";
         }
